@@ -18,69 +18,108 @@ fn dynamicLinkerFromPath(allocator: std.mem.Allocator, path: []const u8) !?[]con
     return try allocator.dupe(u8, target.dynamic_linker.get().?);
 }
 
-fn resolveArgs(allocator: std.mem.Allocator, appdir: []const u8, has_dl: *bool) ![]const []const u8 {
-    var args: std.ArrayListUnmanaged([]const u8) = .{};
-    defer args.deinit(allocator);
+const Executor = struct {
+    args: []const []const u8,
+    appdir: ?[]const u8,
+    dynamic: bool,
 
-    const exe = blk: {
-        const base = try std.fmt.allocPrint(allocator, "{s}/entrypoint", .{appdir});
-        var buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
-        const link = std.fs.readLinkAbsolute(base, &buf) catch break :blk base;
-        allocator.free(base);
-        break :blk try std.fmt.allocPrint(allocator, "{s}{s}", .{ appdir, link });
+    const Resolver = enum {
+        standalone,
+        appimage,
     };
 
-    if (try dynamicLinkerFromPath(allocator, exe)) |dl0| {
-        defer allocator.free(dl0);
-        if (try dynamicLinkerFromPath(allocator, "/usr/bin/env")) |dl| {
-            log.info("dynamic linker: {s}", .{dl});
-            try args.append(allocator, dl);
-            has_dl.* = true;
-        } else {
-            log.warn("unable to figure out the dynamic linker, falling back to: {s}", .{dl0});
+    pub fn resolve(allocator: std.mem.Allocator, comptime resolver: Resolver) !@This() {
+        const appdir = switch (resolver) {
+            .standalone => null,
+            .appimage => try std.fs.selfExeDirPathAlloc(allocator),
+        };
+
+        var iter = try std.process.argsWithAllocator(allocator);
+        defer iter.deinit();
+        _ = iter.skip();
+
+        const exe = blk: {
+            switch (resolver) {
+                .standalone => {
+                    if (iter.next()) |exe| {
+                        break :blk try std.fs.realpathAlloc(allocator, exe);
+                    } else {
+                        std.log.err("usage: loader exe [args]", .{});
+                        std.os.exit(1);
+                    }
+                },
+                .appimage => {
+                    const base = try std.fmt.allocPrint(allocator, "{s}/entrypoint", .{appdir});
+                    var buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
+                    const link = std.fs.readLinkAbsolute(base, &buf) catch break :blk base;
+                    allocator.free(base);
+                    break :blk try std.fmt.allocPrint(allocator, "{s}{s}", .{appdir, link});
+                }
+            }
+        };
+
+        var args: std.ArrayListUnmanaged([]const u8) = .{};
+        defer args.deinit(allocator);
+
+        var dynamic = false;
+        if (try dynamicLinkerFromPath(allocator, exe)) |dl0| {
+            defer allocator.free(dl0);
+            if (try dynamicLinkerFromPath(allocator, "/usr/bin/env")) |dl| {
+                log.info("dynamic linker: {s}", .{dl});
+                try args.append(allocator, dl);
+            } else {
+                log.warn("unable to figure out the dynamic linker, falling back to: {s}", .{dl0});
+            }
+            dynamic = true;
         }
+
+        try args.append(allocator, exe);
+        while (iter.next()) |arg| try args.append(allocator, try allocator.dupe(u8, arg));
+
+        return .{
+            .args = try args.toOwnedSlice(allocator),
+            .appdir = appdir,
+            .dynamic = dynamic,
+        };
     }
 
-    try args.append(allocator, exe);
-    var iter = try std.process.argsWithAllocator(allocator);
-    defer iter.deinit();
-    _ = iter.skip();
-    while (iter.next()) |arg| try args.append(allocator, try allocator.dupe(u8, arg));
-    return try args.toOwnedSlice(allocator);
-}
+    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+        for (self.args) |arg| allocator.free(arg);
+        allocator.free(self.args);
+    }
+
+    pub fn exePath(self: @This()) []const u8 {
+        return if (self.dynamic) self.args[1] else self.args[0];
+    }
+};
 
 fn run(allocator: std.mem.Allocator) !void {
-    const appdir = try std.fs.selfExeDirPathAlloc(allocator);
-    defer allocator.free(appdir);
-
-    var has_dl: bool = false;
-    const args = try resolveArgs(allocator, appdir, &has_dl);
-    defer {
-        for (args) |arg| allocator.free(arg);
-        allocator.free(args);
-    }
-
-    const exe = if (has_dl) args[1] else args[0];
+    const resolver = if (comptime @import("options").appimage) .appimage else .standalone;
+    var executor = try Executor.resolve(allocator, resolver);
+    defer executor.deinit(allocator);
 
     {
         var arena = std.heap.ArenaAllocator.init(allocator);
         defer arena.deinit();
-        runtime.setup(arena.allocator(), exe) catch |err| {
+        runtime.setup(arena.allocator(), executor.exePath()) catch |err| {
             log.warn("{}: runtime is incomplete and the program may not function properly", .{err});
         };
-        _ = arena.reset(.retain_capacity);
-        appimage.setup(arena.allocator(), appdir) catch |err| {
-            log.err(
-                \\Failed to setup an namespace inside the AppImage, cannot continue.
-                \\Please run the .AppImage with argument --appimage-mount or --apimage-extract
-                \\and try to run the binaries manually from there.
-                , .{});
-            return err;
-        };
+
+        if (resolver == .appimage) {
+            _ = arena.reset(.retain_capacity);
+            appimage.setup(arena.allocator(), executor.appdir.?) catch |err| {
+                log.err(
+                    \\Failed to setup an namespace inside the AppImage, cannot continue.
+                    \\Please run the .AppImage with argument --appimage-mount or --apimage-extract
+                    \\and try to run the binaries manually from there.
+                    , .{});
+                return err;
+            };
+        }
     }
 
-    log.info("executing: {s}", .{exe});
-    return std.process.execv(allocator, args);
+    log.info("executing: {s}", .{executor.exePath()});
+    return std.process.execv(allocator, executor.args);
 }
 
 pub fn main() !void {

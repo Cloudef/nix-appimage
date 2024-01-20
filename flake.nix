@@ -51,6 +51,7 @@
           src = ./loader;
           zigBuildFlags = [ "-Doptimize=ReleaseSmall" ];
           zigPreferMusl = true;
+          meta.mainProgram = "loader";
         };
 
         packages.runtime =
@@ -98,7 +99,7 @@
             arch = builtins.head (builtins.split "-" system);
             closure = pkgs.writeReferencesToFile drv;
             extras = [
-              "-p" "AppRun f 555 0 0 cat ${packages.loader}/bin/loader"
+              "-p" "AppRun f 555 0 0 cat ${packages.loader}/bin/AppRun"
               "-p" "entrypoint s 555 0 0 ${entrypoint}"
               "-p" "mountroot d 777 0 0" # TODO permissions?
             ] ++ pkgs.lib.optionals (exclude != []) ([ "-wildcards" "-e" ] ++ exclude);
