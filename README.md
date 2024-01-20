@@ -37,9 +37,9 @@ Please open an issue if this is something you want.
 
 ### OpenGL / Vulkan
 
-If you package your program without including the loaders in the bundle and your program dlopens libvulkan / ligGL, then the program has
-high-chance (not 100%) of working on non-NixOS system. The runtime included in this repository also does some hacky things to make the binary
-work also in NixOS system (non 100% guarantee), other non-FHS systems are not supported currently.
+If you package your program without including the loaders in the bundle and your program dlopens libvulkan / libGL, then the program has a
+high-chance (not 100%) of working on a non-NixOS system. The runtime included in this repository also does some hacky things to make the binary
+run also in a NixOS and some other non-FHS systems (non 100% guarantee). The chance of success also depends on a how your binary is constructed.
 
 ### How it works / Comparison with nix-bundle
 
