@@ -92,16 +92,16 @@
         # with a squashfs. When running the AppImage, the squashfs binary is
         # extracted/mounted at an arbitrary place and the AppRun binary within
         # run.
-        mkappimage = { drv, entrypoint, name }:
+        mkappimage = { drv, entrypoint, name, exclude ? [] }:
           let
             arch = builtins.head (builtins.split "-" system);
             closure = pkgs.writeReferencesToFile drv;
             extras = [
-              "AppRun f 555 0 0 cat ${packages.loader}/bin/runtime"
-              "entrypoint s 555 0 0 ${entrypoint}"
-              "mountroot d 777 0 0" # TODO permissions?
-            ];
-            extra-args = pkgs.lib.concatMapStrings (x: " -p \"${x}\"") extras;
+              "-p" "AppRun f 555 0 0 cat ${packages.loader}/bin/runtime"
+              "-p" "entrypoint s 555 0 0 ${entrypoint}"
+              "-p" "mountroot d 777 0 0" # TODO permissions?
+            ] ++ pkgs.lib.optionals (exclude != []) ([ "-wildcards" "-e" ] ++ exclude);
+            extra-args = pkgs.lib.escapeShellArgs extras;
           in
           pkgs.runCommand "${name}-${arch}.AppImage"
             {
