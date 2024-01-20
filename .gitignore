@@ -1,2 +1,5 @@
 # from nix build
 /result
+# from zig
+zig-cache/
+zig-out/

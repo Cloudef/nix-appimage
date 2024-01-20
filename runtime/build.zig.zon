@@ -1,0 +1,10 @@
+.{
+    .name = "runtime",
+    .version = "0.0.0",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig.zon",
+        "build.zig",
+        "src",
+    },
+}

@@ -2,8 +2,9 @@
   description = "AppImage bundler";
 
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-22.05";
+    nixpkgs.url = "github:nixos/nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
+    zig2nix.url = "github:Cloudef/zig2nix";
 
     flake-compat = {
       url = "github:edolstra/flake-compat";
@@ -16,12 +17,12 @@
     };
 
     squashfuse = {
-      url = "github:vasi/squashfuse";
+      url = "github:vasi/squashfuse?rev=d1d7ddafb765098b34239eacaf2f9abee1fbc27c";
       flake = false;
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, ... }@inputs:
+  outputs = { self, nixpkgs, flake-utils, zig2nix, ... }@inputs:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = (import nixpkgs {
@@ -35,11 +36,21 @@
           nativeBuildInputs = with pkgs; [ autoreconfHook libtool pkg-config ];
           buildInputs = with pkgs; [ lz4 xz zlib lzo zstd fuse ];
         };
+
+        zig-env = zig2nix.outputs.zig-env.${system} {
+          zig = zig2nix.outputs.packages.${system}.zig.master;
+        };
       in
       rec {
-        packages.apprun = pkgs.runCommandCC "AppRun" { } ''
-          $CC ${./apprun.c} -Werror -o $out
-        '';
+        apps.bundle = {
+          type = "app";
+          program = ./bundle;
+        };
+
+        packages.loader = zig-env.package {
+          src = ./runtime;
+          zigBuildFlags = [ "-Doptimize=ReleaseSmall" ];
+        };
 
         packages.runtime =
           let
@@ -86,7 +97,7 @@
             arch = builtins.head (builtins.split "-" system);
             closure = pkgs.writeReferencesToFile drv;
             extras = [
-              "AppRun f 555 0 0 cat ${packages.apprun}"
+              "AppRun f 555 0 0 cat ${packages.loader}/bin/runtime"
               "entrypoint s 555 0 0 ${entrypoint}"
               "mountroot d 777 0 0" # TODO permissions?
             ];

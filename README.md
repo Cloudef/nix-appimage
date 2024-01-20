@@ -1,7 +1,7 @@
 # nix-appimage
 
 Create an AppImage, bundling a derivation and all its dependencies into a single-file executable.
-Like [nix-bundle](https://github.com/matthewbauer/nix-bundle), but much faster and without the glibc dependency.
+Like [nix-bundle](https://github.com/matthewbauer/nix-bundle), but much faster and without any libc dependency.
 
 ## Getting started
 
@@ -35,9 +35,11 @@ Please open an issue if this is something you want.
 - This requires Linux User Namespaces (i.e. `CAP_SYS_USER_NS`), which are available since Linux 3.8 (released in 2013).
 - Plain files in the root directory aren't visible to the bundled app.
 
-### OpenGL
+### OpenGL / Vulkan
 
-Addressing issues with running OpenGL apps on non-NixOS systems is also *out of scope* for this project -- you'll still have to use e.g. [nixGL](https://github.com/guibou/nixGL) to make those graphical programs work without NixOS.
+If you package your program without including the loaders in the bundle and your program dlopens libvulkan / ligGL, then the program has
+high-chance (not 100%) of working on non-NixOS system. The runtime included in this repository also does some hacky things to make the binary
+work also in NixOS system (non 100% guarantee), other non-FHS systems are not supported currently.
 
 ### How it works / Comparison with nix-bundle
 
