@@ -200,6 +200,7 @@ fn setupLinux(allocator: std.mem.Allocator, bin: []const u8) !void {
             log.info("setting up a {s} runtime ...", .{@tagName(.nixos)});
 
             // packages that match a soname don't have to be included
+            // this list only includes common libs for doing multimedia stuff on linux
             const map = std.comptime_string_map.ComptimeStringMap([]const u8, .{
                 .{ "libvulkan", "vulkan-loader" },
                 .{ "libGL", "libglvnd" },
@@ -222,6 +223,32 @@ fn setupLinux(allocator: std.mem.Allocator, bin: []const u8) !void {
                 .{ "libjack", "jack-libs:pipewire:libjack2" },
                 .{ "pipewire", "pipewire" },
                 .{ "pulse", "libpulseaudio:pulseaudio" },
+                // below here really should be statically linked or bundled
+                .{ "libgtk-4", "gtk4" },
+                .{ "libgtk-3", "gtk+3" },
+                .{ "libgdk-3", "gtk+3" },
+                .{ "libgtk-x11", "gtk+" },
+                .{ "libgdk-x11", "gtk+" },
+                .{ "libQt6Core", "qtbase" },
+                .{ "libQt5Core", "qtbase" },
+                .{ "libavcodec", "ffmpeg" },
+                .{ "libavdevice", "ffmpeg" },
+                .{ "libavformat", "ffmpeg" },
+                .{ "libavutil", "ffmpeg" },
+                .{ "libpostproc", "ffmpeg" },
+                .{ "libswresample", "ffmpeg" },
+                .{ "libswscale", "ffmpeg" },
+                .{ "libopusfile", "opusfile" },
+                .{ "libopusurl", "opusfile" },
+                .{ "libSDL", "SDL" },
+                .{ "libSDL_mixer", "SDL_mixer" },
+                .{ "libSDL_ttf", "SDL_ttf" },
+                .{ "libSDL_image", "SDL_image" },
+                .{ "libSDL2-2", "SDL2" },
+                .{ "libSDL2_mixer", "SDL2_mixer" },
+                .{ "libSDL2_ttf", "SDL2_ttf" },
+                .{ "libSDL2_image", "SDL2_image" },
+                .{ "libglfw", "glfw" },
             });
 
             const store = try runCmd(allocator, "/run/current-system/sw/bin/nix-store -q --requisites /run/current-system");
