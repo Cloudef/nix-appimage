@@ -4,13 +4,14 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     const exe = b.addExecutable(.{
-        .name = "runtime",
-        .root_source_file = .{ .path = "src/runtime.zig" },
+        .name = "loader",
+        .root_source_file = .{ .path = "src/loader.zig" },
         .target = target,
         .optimize = optimize,
         .link_libc = false,
         .linkage = .static,
         .single_threaded = true,
+        .error_tracing = true,
     });
     b.installArtifact(exe);
     const run_cmd = b.addRunArtifact(exe);

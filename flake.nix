@@ -48,8 +48,9 @@
         };
 
         packages.loader = zig-env.package {
-          src = ./runtime;
+          src = ./loader;
           zigBuildFlags = [ "-Doptimize=ReleaseSmall" ];
+          zigPreferMusl = true;
         };
 
         packages.runtime =
@@ -97,7 +98,7 @@
             arch = builtins.head (builtins.split "-" system);
             closure = pkgs.writeReferencesToFile drv;
             extras = [
-              "-p" "AppRun f 555 0 0 cat ${packages.loader}/bin/runtime"
+              "-p" "AppRun f 555 0 0 cat ${packages.loader}/bin/loader"
               "-p" "entrypoint s 555 0 0 ${entrypoint}"
               "-p" "mountroot d 777 0 0" # TODO permissions?
             ] ++ pkgs.lib.optionals (exclude != []) ([ "-wildcards" "-e" ] ++ exclude);
